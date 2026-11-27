@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>石打丸山｜旅行費用比較</title>
+<title>石打丸山 SNOW TRIP｜旅費シミュレーター</title>
 <style>
 :root {
   --canvas: #f2f0eb;
@@ -70,12 +70,13 @@ a { color: var(--green); text-underline-offset: 3px }
 button:disabled { opacity: .55; cursor: default }
 #share-fallback { display: block; width: 100%; min-height: 12em; margin-top: 8px; font: inherit }
 #share-fallback[hidden] { display: none }
+.trip-title { white-space: nowrap; letter-spacing: .08em; font-weight: 800 }
 </style>
 </head>
 <body>
 <main>
 <header>
-<h1>石打丸山 旅行費用比較</h1>
+<h1>石打丸山 <span class="trip-title" lang="en">SNOW TRIP</span></h1>
 <p>アーバンヒル石打 · 大人5名／室数おまかせ · 1泊2日／夕朝食付き</p>
 </header>
 <form id="options" class="controls">
@@ -113,8 +114,10 @@ button:disabled { opacity: .55; cursor: default }
 <div class="data-actions">
 <button id="export-data" type="button">JSONを保存</button>
 <button id="import-data" type="button">JSONを読み込む</button>
+<button id="reset-draft" type="button">下書きを消して初期値に戻す</button>
 <input id="data-file" type="file" accept=".json,application/json" hidden>
 </div>
+<label><input id="json-include-names" type="checkbox"> 保存するJSONに表示名を含める</label>
 <p id="data-status" role="status"></p>
 <small>運賃やオプションはこのブラウザに自動保存されます。表示名はJSONを読み込んだときに復元できます。</small>
 <p id="draft-status" role="status"></p>
@@ -131,6 +134,7 @@ button:disabled { opacity: .55; cursor: default }
 <div class="data-actions">
 <button id="copy-estimate" type="button" disabled>共有用の見積もりをコピー</button>
 </div>
+<label><input id="share-include-names" type="checkbox"> 共有テキストに表示名を含める</label>
 <p id="share-status" role="status"></p>
 <textarea id="share-fallback" aria-label="共有用の見積もり" readonly hidden></textarea>
 </section>
@@ -230,12 +234,15 @@ function render() {
   get('share-status').textContent = '';
   get('share-fallback').hidden = true;
   shareText = allReady ? [
-    '石打丸山旅行｜2027年1月の見積もり',
+    '石打丸山 SNOW TRIP｜2027年1月の見積もり',
     ...dates.map((quote, index) => [
       '',
       index === 0 ? '1/15（金）〜1/16（土）' : '1/16（土）〜1/17（日）',
       '5人合計 ' + estimate(quote, combined, count),
-      ...costs.map(person => person.name + '　' + personTotal(person, quote))
+      ...costs.map((person, index) => {
+        const name = get('share-include-names').checked ? person.name : participantSlots[index];
+        return name + '　' + personTotal(person, quote);
+      })
     ].join('\n')),
     '',
     '※リフト2日券の追加額が未確定のため概算。昼食・小物レンタル・駅からの移動費は別途。'
@@ -261,7 +268,7 @@ function render() {
 const fareIds = ['tokyo', 'omiya', 'ueno'];
 const participantFields = ['station', 'board', 'wear'];
 
-function exportInputs({ includeNames = true } = {}) {
+function exportInputs({ includeNames = false } = {}) {
   return {
     version: 3,
     fares: Object.fromEntries(fareIds.map(id => [id, get(id).value === '' ? '' : String(get(id).valueAsNumber)])),
@@ -352,6 +359,23 @@ function loadDraft() {
   }
 }
 
+get('reset-draft').addEventListener('click', () => {
+  const status = get('draft-status');
+  try {
+    localStorage.removeItem(draftKey);
+  } catch {
+    status.textContent = '下書きを削除できませんでした。';
+    return;
+  }
+  get('options').reset();
+  get('share-include-names').checked = false;
+  get('data-status').textContent = '';
+  render();
+  status.textContent = '下書きを削除し、初期値に戻しました。';
+});
+
+get('share-include-names').addEventListener('change', render);
+
 get('copy-estimate').addEventListener('click', async () => {
   if (!shareText) return;
   const revision = shareRevision;
@@ -378,7 +402,7 @@ get('export-data').addEventListener('click', () => {
     return;
   }
 
-  const blob = new Blob([JSON.stringify(exportInputs(), null, 2) + '\n'], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(exportInputs({ includeNames: get('json-include-names').checked }), null, 2) + '\n'], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -399,6 +423,7 @@ get('data-file').addEventListener('change', async event => {
   const status = get('data-status');
   input.disabled = true;
   get('import-data').disabled = true;
+  get('reset-draft').disabled = true;
   try {
     const json = (await file.text()).replace(/^\uFEFF/, '');
     restoreInputs(JSON.parse(json));
@@ -410,6 +435,7 @@ get('data-file').addEventListener('change', async event => {
     input.value = '';
     input.disabled = false;
     get('import-data').disabled = false;
+    get('reset-draft').disabled = false;
   }
 });
 
@@ -425,4 +451,5 @@ loadDraft();
 </script>
 </body>
 </html>
+
 
