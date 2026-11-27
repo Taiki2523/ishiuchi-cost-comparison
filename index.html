@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>石打丸山｜旅行費用比較</title>
+<style>
+:root {
+  --canvas: #f2f0eb;
+  --ceramic: #edebe9;
+  --house: #1e3932;
+  --green: #006241;
+  --accent: #00754a;
+  --mint: #d4e9e2;
+  --ink: rgba(0,0,0,.87);
+  --muted: rgba(0,0,0,.64);
+  --line: #d9ddd9;
+}
+* { box-sizing: border-box }
+body { margin: 0; background: var(--canvas); color: var(--ink); font: 16px/1.6 "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; letter-spacing: -.16px }
+main { max-width: 1120px; margin: auto; padding: 16px }
+header { padding: 24px; margin-bottom: 16px; background: var(--ceramic); border-radius: 12px }
+h1 { margin: 0; color: var(--green); font-size: 24px; line-height: 36px; font-weight: 600 }
+header p { margin: 8px 0 0; color: var(--muted) }
+h2 { margin: 0 0 8px; color: var(--ink); font-size: 24px; line-height: 36px; font-weight: 400 }
+.card { min-width: 0; background: white; border-radius: 12px; padding: 24px; box-shadow: 0 0 .5px rgba(0,0,0,.14), 0 1px 1px rgba(0,0,0,.24) }
+.controls { display: grid; gap: 16px }
+fieldset { min-width: 0; border: 0; padding: 0; margin: 16px 0 0 }
+legend { color: var(--house); font-weight: 700; padding: 0 }
+.options, .person { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px 16px }
+.person { border-top: 1px solid var(--line); padding-top: 8px }
+label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 44px }
+select, input[type=number], input[type=text] { max-width: 100%; min-height: 44px; padding: 6px 10px; background: white; color: var(--ink); border: 1px solid #777f79; border-radius: 8px; font: inherit }
+.fare-field { position: relative; margin-block: 8px }
+.fare-field span { position: absolute; top: 0; left: 12px; transform: translateY(-50%); padding-inline: 4px; background: white; font-size: 14px }
+.fare-field .price-input { width: 140px; padding: 12px }
+.fare-field input:valid { background: hsl(160 32% 87% / 33%) }
+.fare-field input:invalid { background: hsl(4 82% 43% / 5%); border-color: #c82014 }
+.fare-field input:focus:valid { border-color: var(--accent) }
+@media(max-width: 767px) {
+  .card { padding: 16px }
+  .fare-field span { font-size: 13px }
+}
+@media(min-width: 768px) { main { padding: 24px } }
+@media(min-width: 1024px) { main { padding: 40px } }
+input[type=checkbox] { width: 20px; height: 20px; margin: 0; accent-color: var(--accent) }
+:focus-visible { outline: 3px solid var(--green); outline-offset: 3px }
+:focus-visible:invalid { outline-color: #c82014 }
+.table-scroll { overflow-x: auto; border-radius: 8px }
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .95rem; font-variant-numeric: tabular-nums }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap }
+thead { background: var(--house); color: white }
+thead th:first-child, tbody th[scope=row] { position: sticky; left: 0 }
+thead th:first-child { background: var(--house) }
+tbody th[scope=row] { background: white }
+tfoot, td.amount-total { background: var(--mint); color: var(--house); font-weight: 700 }
+section { margin-top: 16px }
+summary { cursor: pointer; color: var(--green); font-weight: 700; padding-block: 8px }
+small, footer { color: var(--muted) }
+footer { margin-top: 16px; padding: 16px; background: var(--ceramic); border-radius: 12px; font-size: .875rem }
+a { color: var(--green); text-underline-offset: 3px }
+@media(max-width: 780px) { .options, .person { grid-template-columns: repeat(2,minmax(0,1fr)) } }
+@media(max-width: 480px) { .options, .person { grid-template-columns: 1fr } }
+.data-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px }
+.data-actions button { min-height: 44px; padding: 7px 16px; border: 1px solid var(--green); border-radius: 50px; background: white; color: var(--green); font: inherit; font-weight: 600; cursor: pointer }
+.data-actions button:first-child { background: var(--accent); border-color: var(--accent); color: white }
+.data-actions button:active { transform: scale(.95) }
+#data-status { margin: 8px 0 0 }
+#data-status:empty, #share-status:empty, #draft-status:empty { margin: 0 }
+button:disabled { opacity: .55; cursor: default }
+#share-fallback { display: block; width: 100%; min-height: 12em; margin-top: 8px; font: inherit }
+#share-fallback[hidden] { display: none }
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>石打丸山 旅行費用比較</h1>
+<p>アーバンヒル石打 · 大人5名／室数おまかせ · 1泊2日／夕朝食付き</p>
+</header>
+<form id="options" class="controls">
+<div class="card">
+<h2>共通の設定</h2>
+<p>新幹線は往復、リフト券とレンタルは2日分で計算します。</p>
+<div class="options">
+<label class="fare-field"><span>東京駅の片道（円）</span><input class="price-input" id="tokyo" type="number" min="1" max="999999" step="1" value="6800" required></label>
+<label class="fare-field"><span>大宮駅の片道（円）</span><input class="price-input" id="omiya" type="number" min="1" max="999999" step="1" value="5930" required></label>
+<label class="fare-field"><span>上野駅の片道（円）</span><input class="price-input" id="ueno" type="number" min="1" max="999999" step="1" value="6590" required></label>
+</div>
+<small>片道運賃は駅ごとに変更できます。往復分は片道運賃の2倍で計算します。</small>
+<p><strong>リフト2日券付き（全員）</strong><br><small>基本ツアー代には初日のリフト券が含まれます。2日券への変更額は、日程別の確定額が未確認のため、1人4,100〜5,400円を自動で加算します。</small></p>
+<fieldset>
+<legend>夕食アップグレード（グループ単位）</legend>
+<label>5人共通 <select id="dinner">
+<option value="standard" data-price="0">通常の日替わり鍋</option>
+<option value="sukiyaki" data-price="1000">牛すき焼き食べ放題（＋1,000円／人）</option>
+<option value="shabu-shabu" data-price="1000">牛しゃぶしゃぶ食べ放題（＋1,000円／人）</option>
+</select></label>
+</fieldset>
+<fieldset>
+<legend>アーリーチェックイン（グループ単位）</legend>
+<label><input id="early" type="checkbox"> 5人で利用する（1人＋500円／5人で＋2,500円）</label>
+<small>当日空室時のみ利用できます。</small>
+</fieldset>
+</div>
+<div class="card">
+<h2>参加者ごとの入力</h2>
+<small>レンタル欄は1日あたりの料金です。</small>
+<div id="people"></div>
+</div>
+<div class="card">
+<h2>入力データの保存・復元</h2>
+<div class="data-actions">
+<button id="export-data" type="button">JSONを保存</button>
+<button id="import-data" type="button">JSONを読み込む</button>
+<input id="data-file" type="file" accept=".json,application/json" hidden>
+</div>
+<p id="data-status" role="status"></p>
+<small>運賃やオプションはこのブラウザに自動保存されます。表示名はJSONを読み込んだときに復元できます。</small>
+<p id="draft-status" role="status"></p>
+</div>
+</form>
+<section class="card table-scroll" tabindex="0" aria-labelledby="resultsTitle">
+<h2 id="resultsTitle">日程別の見積もり</h2>
+<p id="difference" aria-live="polite"></p>
+<table>
+<thead><tr><th scope="col">参加者</th><th scope="col">1/15（金）〜1/16（土）</th><th scope="col">1/16（土）〜1/17（日）</th></tr></thead>
+<tbody id="individual"></tbody>
+<tfoot id="total"></tfoot>
+</table>
+<div class="data-actions">
+<button id="copy-estimate" type="button" disabled>共有用の見積もりをコピー</button>
+</div>
+<p id="share-status" role="status"></p>
+<textarea id="share-fallback" aria-label="共有用の見積もり" readonly hidden></textarea>
+</section>
+<section class="card">
+<details>
+<summary>参加者ごとの費用内訳</summary>
+<p>各金額は1人あたりです。基本ツアー代には宿泊・夕朝食・初日のリフト券が含まれます。</p>
+<div class="table-scroll" tabindex="0" aria-label="参加者別の総額と費用内訳">
+<table>
+<thead><tr><th scope="col">参加者</th><th scope="col">1/15出発の総額</th><th scope="col">1/16出発の総額</th><th scope="col">1/15の基本ツアー代</th><th scope="col">1/16の基本ツアー代</th><th scope="col">リフト2日券の追加</th><th scope="col">新幹線往復</th><th scope="col">ボード2日分</th><th scope="col">ウェア2日分</th><th scope="col">夕食追加</th><th scope="col">アーリーチェックイン</th></tr></thead>
+<tbody id="breakdown"></tbody>
+</table>
+</div>
+</details>
+</section>
+<footer>
+<p>昼食・小物レンタル・駅からの移動費は別途。</p>
+<a href="https://yoyaku.travel-inn.co.jp/dom_tour_tin/tintour/JP/detail?c1=18&amp;c2=2851&amp;c3=046001&amp;br=5G&amp;hcd=I0#booking">トラベルインのプラン詳細・予約カレンダー</a>
+</footer>
+</main>
+<script>
+const get = id => document.getElementById(id);
+const participantSlots = Array.from({ length: 5 }, (_, index) => '参加者' + (index + 1));
+const dates = [{ base: 11000 }, { base: 16300 }];
+const liftSurcharge = [4100, 5400];
+const number = new Intl.NumberFormat('ja-JP');
+const yen = amount => number.format(amount) + '円';
+const range = (min, max) => min === max ? yen(min) : number.format(min) + '〜' + yen(max);
+
+get('people').innerHTML = participantSlots.map((label, index) => `
+  <fieldset class="person">
+    <legend>${label}</legend>
+    <label>表示名（任意） <input id="name-${index}" type="text" maxlength="40"></label>
+    <label>乗車駅
+      <select id="station-${index}">
+        <option value="">未選択</option><option value="tokyo">東京駅</option><option value="ueno">上野駅</option><option value="omiya">大宮駅</option>
+      </select>
+    </label>
+    <label>ボードセット
+      <select id="board-${index}">
+        <option value="700">通常 700円</option><option value="2500">アップグレード 2,500円</option><option value="0">レンタルしない</option>
+      </select>
+    </label>
+    <label>ウェア
+      <select id="wear-${index}">
+        <option value="700">通常 700円</option><option value="2000">アップグレード 2,000円</option><option value="0">レンタルしない</option>
+      </select>
+    </label>
+  </fieldset>`).join('');
+
+function escapeHtml(value) {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function row(label, values, totalColumns = 0) {
+  return `<tr><th scope="row">${escapeHtml(label)}</th>${values.map((value, index) => `<td${index < totalColumns ? ' class="amount-total"' : ''}>${value}</td>`).join('')}</tr>`;
+}
+
+let shareText = '';
+let shareRevision = 0;
+
+function render() {
+  const stations = { tokyo: get('tokyo'), omiya: get('omiya'), ueno: get('ueno') };
+  const dinner = Number(get('dinner').selectedOptions[0].dataset.price);
+  const early = get('early').checked ? 500 : 0;
+  const costs = participantSlots.map((label, index) => {
+    const name = get('name-' + index).value.trim() || label;
+    const station = get('station-' + index).value;
+    const fare = stations[station];
+    const board = Number(get('board-' + index).value) * 2;
+    const wear = Number(get('wear-' + index).value) * 2;
+    const train = fare?.validity.valid ? fare.valueAsNumber * 2 : null;
+    const issue = !fare ? '乗車駅を選択' : '片道運賃を確認';
+    return { name, train, board, wear, issue, subtotal: train + board + wear + early + dinner };
+  });
+
+  const estimate = (quote, subtotal, count) => range(
+    subtotal + (quote.base + liftSurcharge[0]) * count,
+    subtotal + (quote.base + liftSurcharge[1]) * count
+  );
+  const personTotal = (person, quote) => {
+    if (person.train === null) return person.issue;
+    return estimate(quote, person.subtotal, 1);
+  };
+
+  get('individual').innerHTML = costs.map(person =>
+    row(person.name, dates.map(quote => personTotal(person, quote)))).join('');
+
+  const count = costs.length;
+  const allReady = costs.every(person => person.train !== null);
+  const combined = costs.reduce((sum, person) => sum + person.subtotal, 0);
+  get('total').innerHTML = row('5人合計', dates.map(quote =>
+    allReady ? estimate(quote, combined, count) : '入力待ち'));
+
+  shareRevision++;
+  get('copy-estimate').disabled = !allReady;
+  get('share-status').textContent = '';
+  get('share-fallback').hidden = true;
+  shareText = allReady ? [
+    '石打丸山旅行｜2027年1月の見積もり',
+    ...dates.map((quote, index) => [
+      '',
+      index === 0 ? '1/15（金）〜1/16（土）' : '1/16（土）〜1/17（日）',
+      '5人合計 ' + estimate(quote, combined, count),
+      ...costs.map(person => person.name + '　' + personTotal(person, quote))
+    ].join('\n')),
+    '',
+    '※リフト2日券の追加額が未確定のため概算。昼食・小物レンタル・駅からの移動費は別途。'
+  ].join('\n') : '';
+
+  get('breakdown').innerHTML = costs.map(person => row(person.name, [
+    ...dates.map(quote => personTotal(person, quote)),
+    ...dates.map(quote => yen(quote.base)),
+    range(...liftSurcharge),
+    person.train === null ? person.issue : yen(person.train),
+    yen(person.board),
+    yen(person.wear),
+    yen(dinner),
+    yen(early)
+  ], dates.length)).join('');
+
+  const baseDifference = dates[1].base - dates[0].base;
+  const liftSpread = liftSurcharge[1] - liftSurcharge[0];
+  get('difference').textContent = '1/15出発のほうが、5人で ' +
+    range((baseDifference - liftSpread) * count, (baseDifference + liftSpread) * count) + ' 安い見込みです。';
+}
+
+const fareIds = ['tokyo', 'omiya', 'ueno'];
+const participantFields = ['station', 'board', 'wear'];
+
+function exportInputs({ includeNames = true } = {}) {
+  return {
+    version: 3,
+    fares: Object.fromEntries(fareIds.map(id => [id, get(id).value === '' ? '' : String(get(id).valueAsNumber)])),
+    dinner: get('dinner').value,
+    early: get('early').checked,
+    participants: participantSlots.map((_, index) => ({
+      name: includeNames ? get('name-' + index).value : '',
+      ...Object.fromEntries(participantFields.map(field => [field, get(field + '-' + index).value]))
+    }))
+  };
+}
+
+function restoreInputs(data, { includeNames = true } = {}) {
+  const validFare = value => typeof value === 'string' &&
+    (value === '' || (/^[0-9]+$/.test(value) &&
+      Number(value) >= 1 && Number(value) <= 999999));
+  const legacy = data?.version === 1 || data?.version === 2;
+  const source = data?.participants;
+  const participants = legacy && source && typeof source === 'object' && !Array.isArray(source)
+    ? Object.entries(source).map(([name, fields]) => ({ ...fields, name }))
+    : source;
+  const validParticipants = Array.isArray(participants) &&
+    participants.length === participantSlots.length &&
+    participantSlots.every((_, index) => {
+      const participant = participants[index];
+      return typeof participant?.name === 'string' && participant.name.length <= 40 &&
+        !/[\r\n]/.test(participant.name) && participantFields.every(field => {
+          const select = get(field + '-' + index);
+          return Array.from(select.options).some(option => option.value === participant[field]);
+        });
+    });
+  const legacyDinnerIds = ['standard', 'sukiyaki', 'shabu-shabu'];
+  const dinner = data?.version === 1 && Number.isInteger(data.dinner)
+    ? legacyDinnerIds[data.dinner] : data?.dinner;
+  const validDinner = Array.from(get('dinner').options).some(option => option.value === dinner);
+  if ((!legacy && data?.version !== 3) ||
+      (data.version === 1 && !Number.isInteger(data.dinner)) ||
+      !fareIds.every(id => validFare(data.fares?.[id])) ||
+      !validDinner || typeof data.early !== 'boolean' ||
+      !validParticipants) {
+    throw new Error('入力データの形式が一致しません。');
+  }
+
+  for (const id of fareIds) get(id).value = data.fares[id];
+  get('dinner').value = dinner;
+  get('early').checked = data.early;
+  participants.forEach((participant, index) => {
+    get('name-' + index).value = includeNames ? participant.name : '';
+    for (const field of participantFields) {
+      get(field + '-' + index).value = participant[field];
+    }
+  });
+  render();
+}
+
+const draftKey = 'ishiuchi-cost-comparison:2027-01:draft';
+
+function hasInvalidFare() {
+  return fareIds.some(id => {
+    const input = get(id);
+    return input.validity.badInput || (input.value !== '' && !input.validity.valid);
+  });
+}
+
+function saveDraft() {
+  const status = get('draft-status');
+  if (hasInvalidFare()) {
+    status.textContent = '運賃入力を修正すると、下書きを自動保存します。';
+    return;
+  }
+  try {
+    localStorage.setItem(draftKey, JSON.stringify(exportInputs({ includeNames: false })));
+    status.textContent = '';
+  } catch {
+    status.textContent = '下書きを保存できませんでした。JSONで保存できます。';
+  }
+}
+
+function loadDraft() {
+  try {
+    const draft = localStorage.getItem(draftKey);
+    if (draft !== null) {
+      restoreInputs(JSON.parse(draft), { includeNames: false });
+      get('draft-status').textContent = '前回の下書きを復元しました。';
+    }
+  } catch {
+    get('draft-status').textContent = '下書きを復元できませんでした。JSONから読み込めます。';
+  }
+}
+
+get('copy-estimate').addEventListener('click', async () => {
+  if (!shareText) return;
+  const revision = shareRevision;
+  const snapshot = shareText;
+  try {
+    await navigator.clipboard.writeText(snapshot);
+    if (revision === shareRevision) {
+      get('share-status').textContent = '見積もりをコピーしました。LINEなどに貼り付けられます。';
+    }
+  } catch {
+    if (revision !== shareRevision) return;
+    const fallback = get('share-fallback');
+    fallback.value = snapshot;
+    fallback.hidden = false;
+    fallback.focus();
+    fallback.select();
+    get('share-status').textContent = '自動コピーが使えないため、下のテキストをコピーしてください。';
+  }
+});
+
+get('export-data').addEventListener('click', () => {
+  if (hasInvalidFare()) {
+    get('data-status').textContent = '片道運賃を確認してから保存してください。';
+    return;
+  }
+
+  const blob = new Blob([JSON.stringify(exportInputs(), null, 2) + '\n'], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'ishiuchi-trip-inputs.json';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  get('data-status').textContent = 'JSONのダウンロードを開始しました。';
+});
+
+get('import-data').addEventListener('click', () => get('data-file').click());
+get('data-file').addEventListener('change', async event => {
+  const input = event.currentTarget;
+  const file = input.files[0];
+  if (!file) return;
+
+  const status = get('data-status');
+  input.disabled = true;
+  get('import-data').disabled = true;
+  try {
+    const json = (await file.text()).replace(/^\uFEFF/, '');
+    restoreInputs(JSON.parse(json));
+    saveDraft();
+    status.textContent = '入力内容を復元し、見積もりを更新しました。';
+  } catch {
+    status.textContent = '読み込めませんでした。このページで保存したJSONを選んでください。';
+  } finally {
+    input.value = '';
+    input.disabled = false;
+    get('import-data').disabled = false;
+  }
+});
+
+get('options').addEventListener('input', event => {
+  if (event.target === get('data-file')) return;
+  get('data-status').textContent = '';
+  render();
+  saveDraft();
+});
+get('options').addEventListener('submit', event => event.preventDefault());
+render();
+loadDraft();
+</script>
+</body>
+</html>
+
