@@ -180,11 +180,23 @@ button:disabled { opacity: .55; cursor: default }
 </main>
 <script>
 // BEGIN GENERATED ESTIMATE MODEL
-const RENTAL_DAYS = 2;
-const RENTALS = {
-  board: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2500, payee: 'rental' } },
-  wear: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2000, payee: 'rental' } }
+const ISHIUCHI_2027 = {
+  id: 'ishiuchi-2027-01',
+  title: '石打丸山 SNOW TRIP',
+  shareTitle: '石打丸山 SNOW TRIP｜2027年1月の見積もり',
+  dates: [
+    { departure: '1/15', label: '1/15（金）〜1/16（土）', base: 11000, lift: [4100, 5400], liftPayee: 'tour' },
+    { departure: '1/16', label: '1/16（土）〜1/17（日）', base: 16300, lift: [4100, 5400], liftPayee: 'tour' }
+  ],
+  rentalDays: 2,
+  rentals: {
+    board: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2500, payee: 'rental' } },
+    wear: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2000, payee: 'rental' } }
+  }
 };
+
+
+const RENTALS = ISHIUCHI_2027.rentals;
 const LEGACY_RENTALS = {
   board: { '0': 'none', '700': 'basic', '2500': 'upgrade' },
   wear: { '0': 'none', '700': 'basic', '2000': 'upgrade' }
@@ -193,26 +205,34 @@ const STATIONS = ['tokyo', 'omiya', 'ueno'];
 const DINNERS = ['standard', 'sukiyaki', 'shabu-shabu'];
 const PARTICIPANT_COUNT = 5;
 
-function rentalCosts(boardId, wearId, rates = RENTALS) {
+function rentalCosts(boardId, wearId, rates = RENTALS, days = ISHIUCHI_2027.rentalDays) {
   const board = rates.board[boardId];
   const wear = rates.wear[wearId];
-  const byPayee = { tour: 0, rental: 0 };
-  for (const item of [board, wear]) byPayee[item.payee] += item.daily * RENTAL_DAYS;
-  return { board: board.daily * RENTAL_DAYS, wear: wear.daily * RENTAL_DAYS, byPayee };
+  const byPayee = { tour: 0, rental: 0, facility: 0 };
+  for (const item of [board, wear]) byPayee[item.payee] += item.daily * days;
+  return { board: board.daily * days, wear: wear.daily * days, byPayee };
 }
 
-function calculateEstimate(dates, lift, participants, onsite) {
+function calculateTrip(plan, participants, onsite) {
   const count = participants.length;
   const sum = getAmount => participants.reduce((total, person) => total + getAmount(person), 0);
   const train = participants.every(person => person.train !== null) ? sum(person => person.train) : null;
-  const rental = sum(person => person.byPayee.rental);
-  const tourRentals = sum(person => person.byPayee.tour);
-  return dates.map(({ base }) => {
-    const tour = lift.map(extra => (base + extra) * count + tourRentals);
-    const facility = onsite * count;
+  const rentals = {
+    tour: sum(person => person.byPayee.tour),
+    rental: sum(person => person.byPayee.rental),
+    facility: sum(person => person.byPayee.facility)
+  };
+
+  return plan.dates.map(({ base, lift, liftPayee }) => {
+    const payment = {
+      tour: lift.map(extra => base * count + rentals.tour + (liftPayee === 'tour' ? extra * count : 0)),
+      rental: lift.map(extra => rentals.rental + (liftPayee === 'rental' ? extra * count : 0)),
+      facility: lift.map(extra => onsite * count + rentals.facility + (liftPayee === 'facility' ? extra * count : 0))
+    };
     return {
-      tour, rental, facility, train,
-      total: train === null ? null : tour.map(amount => amount + rental + facility + train),
+      ...payment, train,
+      total: train === null ? null : lift.map((_, index) =>
+        payment.tour[index] + payment.rental[index] + payment.facility[index] + train),
       individuals: participants.map(person => person.train === null ? null :
         lift.map(extra => base + extra + person.train + person.board + person.wear + onsite))
     };
@@ -253,8 +273,8 @@ function serializeParticipants(participants, includeNames = false) {
 // END GENERATED ESTIMATE MODEL
 const get = id => document.getElementById(id);
 const participantSlots = Array.from({ length: PARTICIPANT_COUNT }, (_, index) => '参加者' + (index + 1));
-const dates = [{ base: 11000 }, { base: 16300 }];
-const liftSurcharge = [4100, 5400];
+const plan = ISHIUCHI_2027;
+const dates = plan.dates;
 const number = new Intl.NumberFormat('ja-JP');
 const yen = amount => number.format(amount) + '円';
 const range = (min, max) => min === max ? yen(min) : number.format(min) + '〜' + yen(max);
@@ -311,7 +331,7 @@ function render() {
     return { name, station, train, issue, ...rentals };
   });
 
-  const estimates = calculateEstimate(dates, liftSurcharge, costs, dinner + early);
+  const estimates = calculateTrip(plan, costs, dinner + early);
   const personTotal = (index, estimate) => {
     const amount = estimate.individuals[index];
     return amount === null ? costs[index].issue : range(...amount);
@@ -336,8 +356,8 @@ function render() {
 
   const paymentRows = [
     row('トラベルイン（ツアー・リフト・通常レンタル）', estimates.map(estimate => range(...estimate.tour))),
-    row('レンタル専用サイト（アップグレード）', estimates.map(estimate => yen(estimate.rental))),
-    row('宿泊施設で現地払い（夕食変更・早着）', estimates.map(estimate => yen(estimate.facility))),
+    row('レンタル専用サイト（アップグレード）', estimates.map(estimate => range(...estimate.rental))),
+    row('宿泊施設で現地払い（夕食変更・早着）', estimates.map(estimate => range(...estimate.facility))),
     row('新幹線（往復）', estimates.map(estimate => estimate.train === null ? '入力待ち' : yen(estimate.train)))
   ];
   get('payments').innerHTML = paymentRows.join('');
@@ -348,10 +368,10 @@ function render() {
   get('share-status').textContent = '';
   get('share-fallback').hidden = true;
   shareText = allReady ? [
-    '石打丸山 SNOW TRIP｜2027年1月の見積もり',
+    plan.shareTitle,
     ...estimates.map((estimate, index) => [
       '',
-      index === 0 ? '1/15（金）〜1/16（土）' : '1/16（土）〜1/17（日）',
+      dates[index].label,
       '5人合計 ' + groupTotals[index],
       ...costs.map((person, index) => {
         const name = get('share-include-names').checked ? person.name : participantSlots[index];
@@ -368,7 +388,7 @@ function render() {
   ];
   const detailValues = person => [
     ...dates.map(quote => yen(quote.base)),
-    range(...liftSurcharge),
+    dates.map(date => range(...date.lift)).join(' ／ '),
     person.train === null ? person.issue : yen(person.train),
     yen(person.board), yen(person.wear), yen(dinner), yen(early)
   ];
@@ -390,9 +410,13 @@ function render() {
   </article>`).join('');
 
   const baseDifference = dates[1].base - dates[0].base;
-  const liftSpread = liftSurcharge[1] - liftSurcharge[0];
-  get('difference').textContent = '1/15出発のほうが、5人で ' +
-    range((baseDifference - liftSpread) * count, (baseDifference + liftSpread) * count) + ' 安い見込みです。';
+  const minDifference = baseDifference + dates[1].lift[0] - dates[0].lift[1];
+  const maxDifference = baseDifference + dates[1].lift[1] - dates[0].lift[0];
+  get('difference').textContent = minDifference > 0
+    ? dates[0].departure + '出発のほうが、5人で ' + range(minDifference * count, maxDifference * count) + ' 安い見込みです。'
+    : maxDifference < 0
+      ? dates[1].departure + '出発のほうが、5人で ' + range(-maxDifference * count, -minDifference * count) + ' 安い見込みです。'
+      : 'リフト券の追加料金によって、日程間の価格差が変わります。';
 }
 
 const fareIds = STATIONS;
