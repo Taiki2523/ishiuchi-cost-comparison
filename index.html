@@ -71,6 +71,16 @@ button:disabled { opacity: .55; cursor: default }
 #share-fallback { display: block; width: 100%; min-height: 12em; margin-top: 8px; font: inherit }
 #share-fallback[hidden] { display: none }
 .trip-title { white-space: nowrap; letter-spacing: .08em; font-weight: 800 }
+.detail-cards { display: none }
+.detail-cards article { margin-block: 10px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px }
+.detail-cards dl { margin-block: 8px 12px }
+.detail-cards dl div { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 4px }
+.detail-cards dd { margin: 0; text-align: right }
+.detail-totals { padding: 8px; background: var(--mint); color: var(--house); font-weight: 700 }
+@media (max-width: 767px) {
+  .desktop-breakdown { display: none }
+  .detail-cards { display: block }
+}
 </style>
 </head>
 <body>
@@ -134,15 +144,28 @@ button:disabled { opacity: .55; cursor: default }
 <div class="data-actions">
 <button id="copy-estimate" type="button" disabled>共有用の見積もりをコピー</button>
 </div>
+<p id="share-readiness" aria-live="polite" hidden></p>
 <label><input id="share-include-names" type="checkbox"> 共有テキストに表示名を含める</label>
 <p id="share-status" role="status"></p>
 <textarea id="share-fallback" aria-label="共有用の見積もり" readonly hidden></textarea>
+</section>
+<section class="card" aria-labelledby="payment-title">
+<h2 id="payment-title">支払先ごとの内訳</h2>
+<p>両日程の5人分。リフト2日券への追加額は概算です。</p>
+<div class="table-scroll" tabindex="0" aria-label="支払先別の費用">
+<table>
+<thead><tr><th scope="col">支払先</th><th scope="col">1/15出発</th><th scope="col">1/16出発</th></tr></thead>
+<tbody id="payments"></tbody>
+<tfoot id="payments-total"></tfoot>
+</table>
+</div>
 </section>
 <section class="card">
 <details>
 <summary>参加者ごとの費用内訳</summary>
 <p>各金額は1人あたりです。基本ツアー代には宿泊・夕朝食・初日のリフト券が含まれます。</p>
-<div class="table-scroll" tabindex="0" aria-label="参加者別の総額と費用内訳">
+<div id="breakdown-cards" class="detail-cards"></div>
+<div class="table-scroll desktop-breakdown" tabindex="0" aria-label="参加者別の総額と費用内訳">
 <table>
 <thead><tr><th scope="col">参加者</th><th scope="col">1/15出発の総額</th><th scope="col">1/16出発の総額</th><th scope="col">1/15の基本ツアー代</th><th scope="col">1/16の基本ツアー代</th><th scope="col">リフト2日券の追加</th><th scope="col">新幹線往復</th><th scope="col">ボード2日分</th><th scope="col">ウェア2日分</th><th scope="col">夕食追加</th><th scope="col">アーリーチェックイン</th></tr></thead>
 <tbody id="breakdown"></tbody>
@@ -208,7 +231,7 @@ function render() {
     const wear = Number(get('wear-' + index).value) * 2;
     const train = fare?.validity.valid ? fare.valueAsNumber * 2 : null;
     const issue = !fare ? '乗車駅を選択' : '片道運賃を確認';
-    return { name, train, board, wear, issue, subtotal: train + board + wear + early + dinner };
+    return { name, station, train, board, wear, issue, subtotal: train + board + wear + early + dinner };
   });
 
   const estimate = (quote, subtotal, count) => range(
@@ -229,6 +252,30 @@ function render() {
   get('total').innerHTML = row('5人合計', dates.map(quote =>
     allReady ? estimate(quote, combined, count) : '入力待ち'));
 
+  const missingStations = costs.filter(person => !person.station).map(person => person.name);
+  const stationLabels = { tokyo: '東京', omiya: '大宮', ueno: '上野' };
+  const invalidStations = [...new Set(costs.filter(person => person.station && person.train === null)
+    .map(person => stationLabels[person.station]))];
+  const readiness = get('share-readiness');
+  const inputIssues = [];
+  if (missingStations.length) inputIssues.push('乗車駅が未選択：' + missingStations.join('、'));
+  if (invalidStations.length) inputIssues.push('片道運賃を確認：' + invalidStations.join('、'));
+  readiness.textContent = inputIssues.join('。');
+  readiness.hidden = allReady;
+
+  const standardRentals = costs.reduce((sum, person) =>
+    sum + (person.board === 1400 ? person.board : 0) + (person.wear === 1400 ? person.wear : 0), 0);
+  const allRentals = costs.reduce((sum, person) => sum + person.board + person.wear, 0);
+  const trainPayment = allReady ? yen(costs.reduce((sum, person) => sum + person.train, 0)) : '入力待ち';
+  const paymentRows = [
+    row('トラベルイン（ツアー・リフト・通常レンタル）', dates.map(quote => estimate(quote, standardRentals, count))),
+    row('レンタル専用サイト（アップグレード）', dates.map(() => yen(allRentals - standardRentals))),
+    row('宿泊施設で現地払い（夕食変更・早着）', dates.map(() => yen((dinner + early) * count))),
+    row('新幹線（往復）', dates.map(() => trainPayment))
+  ];
+  get('payments').innerHTML = paymentRows.join('');
+  get('payments-total').innerHTML = get('total').innerHTML;
+
   shareRevision++;
   get('copy-estimate').disabled = !allReady;
   get('share-status').textContent = '';
@@ -248,16 +295,32 @@ function render() {
     '※リフト2日券の追加額が未確定のため概算。昼食・小物レンタル・駅からの移動費は別途。'
   ].join('\n') : '';
 
-  get('breakdown').innerHTML = costs.map(person => row(person.name, [
-    ...dates.map(quote => personTotal(person, quote)),
+  const detailLabels = [
+    '1/15の基本ツアー代', '1/16の基本ツアー代', 'リフト2日券の追加',
+    '新幹線往復', 'ボード2日分', 'ウェア2日分', '夕食追加', 'アーリーチェックイン'
+  ];
+  const detailValues = person => [
     ...dates.map(quote => yen(quote.base)),
     range(...liftSurcharge),
     person.train === null ? person.issue : yen(person.train),
-    yen(person.board),
-    yen(person.wear),
-    yen(dinner),
-    yen(early)
+    yen(person.board), yen(person.wear), yen(dinner), yen(early)
+  ];
+  get('breakdown').innerHTML = costs.map(person => row(person.name, [
+    ...dates.map(quote => personTotal(person, quote)), ...detailValues(person)
   ], dates.length)).join('');
+
+  const cards = get('breakdown-cards');
+  const opened = new Set(Array.from(cards.querySelectorAll('details[open]'), item => item.dataset.slot));
+  const lines = (labels, values) => labels.map((label, index) =>
+    `<div><dt>${label}</dt><dd>${values[index]}</dd></div>`).join('');
+  cards.innerHTML = costs.map((person, index) => `<article>
+    <h3>${escapeHtml(person.name)}</h3>
+    <dl class="detail-totals">${lines(['1/15出発の総額', '1/16出発の総額'], dates.map(quote => personTotal(person, quote)))}</dl>
+    <details data-slot="${index}"${opened.has(String(index)) ? ' open' : ''}>
+      <summary>費用の明細</summary>
+      <dl>${lines(detailLabels, detailValues(person))}</dl>
+    </details>
+  </article>`).join('');
 
   const baseDifference = dates[1].base - dates[0].base;
   const liftSpread = liftSurcharge[1] - liftSurcharge[0];
@@ -312,6 +375,8 @@ function restoreInputs(data, { includeNames = true } = {}) {
     throw new Error('入力データの形式が一致しません。');
   }
 
+  get('json-include-names').checked = false;
+  get('share-include-names').checked = false;
   for (const id of fareIds) get(id).value = data.fares[id];
   get('dinner').value = dinner;
   get('early').checked = data.early;
@@ -451,5 +516,6 @@ loadDraft();
 </script>
 </body>
 </html>
+
 
 
