@@ -179,13 +179,91 @@ button:disabled { opacity: .55; cursor: default }
 </footer>
 </main>
 <script>
+// BEGIN GENERATED ESTIMATE MODEL
+const RENTAL_DAYS = 2;
+const RENTALS = {
+  board: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2500, payee: 'rental' } },
+  wear: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2000, payee: 'rental' } }
+};
+const LEGACY_RENTALS = {
+  board: { '0': 'none', '700': 'basic', '2500': 'upgrade' },
+  wear: { '0': 'none', '700': 'basic', '2000': 'upgrade' }
+};
+const STATIONS = ['tokyo', 'omiya', 'ueno'];
+const DINNERS = ['standard', 'sukiyaki', 'shabu-shabu'];
+const PARTICIPANT_COUNT = 5;
+
+function rentalCosts(boardId, wearId, rates = RENTALS) {
+  const board = rates.board[boardId];
+  const wear = rates.wear[wearId];
+  const byPayee = { tour: 0, rental: 0 };
+  for (const item of [board, wear]) byPayee[item.payee] += item.daily * RENTAL_DAYS;
+  return { board: board.daily * RENTAL_DAYS, wear: wear.daily * RENTAL_DAYS, byPayee };
+}
+
+function calculateEstimate(dates, lift, participants, onsite) {
+  const count = participants.length;
+  const sum = getAmount => participants.reduce((total, person) => total + getAmount(person), 0);
+  const train = participants.every(person => person.train !== null) ? sum(person => person.train) : null;
+  const rental = sum(person => person.byPayee.rental);
+  const tourRentals = sum(person => person.byPayee.tour);
+  return dates.map(({ base }) => {
+    const tour = lift.map(extra => (base + extra) * count + tourRentals);
+    const facility = onsite * count;
+    return {
+      tour, rental, facility, train,
+      total: train === null ? null : tour.map(amount => amount + rental + facility + train),
+      individuals: participants.map(person => person.train === null ? null :
+        lift.map(extra => base + extra + person.train + person.board + person.wear + onsite))
+    };
+  });
+}
+
+function validateTripInputs(data) {
+  const invalid = () => { throw new Error('入力データの形式が一致しません。'); };
+  if (!data || ![1, 2, 3, 4].includes(data.version) || typeof data.early !== 'boolean') invalid();
+  const validFare = value => typeof value === 'string' &&
+    (value === '' || (/^[0-9]+$/.test(value) && Number(value) >= 1 && Number(value) <= 999999));
+  if (!STATIONS.every(id => validFare(data.fares?.[id]))) invalid();
+  const dinner = data.version === 1 && Number.isInteger(data.dinner) ? DINNERS[data.dinner] : data.dinner;
+  if (!DINNERS.includes(dinner) || (data.version === 1 && !Number.isInteger(data.dinner))) invalid();
+
+  const source = data.participants;
+  const legacyObject = data.version <= 2;
+  if (legacyObject ? !source || typeof source !== 'object' || Array.isArray(source) : !Array.isArray(source)) invalid();
+  const entries = legacyObject ? Object.entries(source).map(([name, fields]) => ({ ...fields, name })) : source;
+  if (entries.length !== PARTICIPANT_COUNT) invalid();
+  const participants = entries.map(person => {
+    if (typeof person?.name !== 'string' || person.name.length > 40 || /[\r\n]/.test(person.name) ||
+        !['', ...STATIONS].includes(person.station)) invalid();
+    const board = data.version < 4 && typeof person.board === 'string' ? LEGACY_RENTALS.board[person.board] : person.board;
+    const wear = data.version < 4 && typeof person.wear === 'string' ? LEGACY_RENTALS.wear[person.wear] : person.wear;
+    if (typeof board !== 'string' || typeof wear !== 'string' ||
+        !Object.hasOwn(RENTALS.board, board) || !Object.hasOwn(RENTALS.wear, wear) ||
+        (data.version < 4 && (!Object.hasOwn(LEGACY_RENTALS.board, person.board) ||
+          !Object.hasOwn(LEGACY_RENTALS.wear, person.wear)))) invalid();
+    return { name: person.name, station: person.station, board, wear };
+  });
+  return { version: 4, fares: data.fares, dinner, early: data.early, participants };
+}
+
+function serializeParticipants(participants, includeNames = false) {
+  return participants.map(({ name, station, board, wear }) => ({ name: includeNames ? name : '', station, board, wear }));
+}
+// END GENERATED ESTIMATE MODEL
 const get = id => document.getElementById(id);
-const participantSlots = Array.from({ length: 5 }, (_, index) => '参加者' + (index + 1));
+const participantSlots = Array.from({ length: PARTICIPANT_COUNT }, (_, index) => '参加者' + (index + 1));
 const dates = [{ base: 11000 }, { base: 16300 }];
 const liftSurcharge = [4100, 5400];
 const number = new Intl.NumberFormat('ja-JP');
 const yen = amount => number.format(amount) + '円';
 const range = (min, max) => min === max ? yen(min) : number.format(min) + '〜' + yen(max);
+
+const rentalOptions = rates => [
+  `<option value="basic">通常 ${yen(rates.basic.daily)}</option>`,
+  `<option value="upgrade">アップグレード ${yen(rates.upgrade.daily)}</option>`,
+  '<option value="none">レンタルしない</option>'
+].join('');
 
 get('people').innerHTML = participantSlots.map((label, index) => `
   <fieldset class="person">
@@ -198,12 +276,12 @@ get('people').innerHTML = participantSlots.map((label, index) => `
     </label>
     <label>ボードセット
       <select id="board-${index}">
-        <option value="700">通常 700円</option><option value="2500">アップグレード 2,500円</option><option value="0">レンタルしない</option>
+        ${rentalOptions(RENTALS.board)}
       </select>
     </label>
     <label>ウェア
       <select id="wear-${index}">
-        <option value="700">通常 700円</option><option value="2000">アップグレード 2,000円</option><option value="0">レンタルしない</option>
+        ${rentalOptions(RENTALS.wear)}
       </select>
     </label>
   </fieldset>`).join('');
@@ -227,30 +305,23 @@ function render() {
     const name = get('name-' + index).value.trim() || label;
     const station = get('station-' + index).value;
     const fare = stations[station];
-    const board = Number(get('board-' + index).value) * 2;
-    const wear = Number(get('wear-' + index).value) * 2;
+    const rentals = rentalCosts(get('board-' + index).value, get('wear-' + index).value);
     const train = fare?.validity.valid ? fare.valueAsNumber * 2 : null;
     const issue = !fare ? '乗車駅を選択' : '片道運賃を確認';
-    return { name, station, train, board, wear, issue, subtotal: train + board + wear + early + dinner };
+    return { name, station, train, issue, ...rentals };
   });
 
-  const estimate = (quote, subtotal, count) => range(
-    subtotal + (quote.base + liftSurcharge[0]) * count,
-    subtotal + (quote.base + liftSurcharge[1]) * count
-  );
-  const personTotal = (person, quote) => {
-    if (person.train === null) return person.issue;
-    return estimate(quote, person.subtotal, 1);
+  const estimates = calculateEstimate(dates, liftSurcharge, costs, dinner + early);
+  const personTotal = (index, estimate) => {
+    const amount = estimate.individuals[index];
+    return amount === null ? costs[index].issue : range(...amount);
   };
-
-  get('individual').innerHTML = costs.map(person =>
-    row(person.name, dates.map(quote => personTotal(person, quote)))).join('');
-
+  const groupTotals = estimates.map(estimate => estimate.total === null ? '入力待ち' : range(...estimate.total));
+  const allReady = estimates.every(estimate => estimate.total !== null);
   const count = costs.length;
-  const allReady = costs.every(person => person.train !== null);
-  const combined = costs.reduce((sum, person) => sum + person.subtotal, 0);
-  get('total').innerHTML = row('5人合計', dates.map(quote =>
-    allReady ? estimate(quote, combined, count) : '入力待ち'));
+  get('individual').innerHTML = costs.map((person, index) =>
+    row(person.name, estimates.map(estimate => personTotal(index, estimate)))).join('');
+  get('total').innerHTML = row('5人合計', groupTotals);
 
   const missingStations = costs.filter(person => !person.station).map(person => person.name);
   const stationLabels = { tokyo: '東京', omiya: '大宮', ueno: '上野' };
@@ -263,15 +334,11 @@ function render() {
   readiness.textContent = inputIssues.join('。');
   readiness.hidden = allReady;
 
-  const standardRentals = costs.reduce((sum, person) =>
-    sum + (person.board === 1400 ? person.board : 0) + (person.wear === 1400 ? person.wear : 0), 0);
-  const allRentals = costs.reduce((sum, person) => sum + person.board + person.wear, 0);
-  const trainPayment = allReady ? yen(costs.reduce((sum, person) => sum + person.train, 0)) : '入力待ち';
   const paymentRows = [
-    row('トラベルイン（ツアー・リフト・通常レンタル）', dates.map(quote => estimate(quote, standardRentals, count))),
-    row('レンタル専用サイト（アップグレード）', dates.map(() => yen(allRentals - standardRentals))),
-    row('宿泊施設で現地払い（夕食変更・早着）', dates.map(() => yen((dinner + early) * count))),
-    row('新幹線（往復）', dates.map(() => trainPayment))
+    row('トラベルイン（ツアー・リフト・通常レンタル）', estimates.map(estimate => range(...estimate.tour))),
+    row('レンタル専用サイト（アップグレード）', estimates.map(estimate => yen(estimate.rental))),
+    row('宿泊施設で現地払い（夕食変更・早着）', estimates.map(estimate => yen(estimate.facility))),
+    row('新幹線（往復）', estimates.map(estimate => estimate.train === null ? '入力待ち' : yen(estimate.train)))
   ];
   get('payments').innerHTML = paymentRows.join('');
   get('payments-total').innerHTML = get('total').innerHTML;
@@ -282,13 +349,13 @@ function render() {
   get('share-fallback').hidden = true;
   shareText = allReady ? [
     '石打丸山 SNOW TRIP｜2027年1月の見積もり',
-    ...dates.map((quote, index) => [
+    ...estimates.map((estimate, index) => [
       '',
       index === 0 ? '1/15（金）〜1/16（土）' : '1/16（土）〜1/17（日）',
-      '5人合計 ' + estimate(quote, combined, count),
+      '5人合計 ' + groupTotals[index],
       ...costs.map((person, index) => {
         const name = get('share-include-names').checked ? person.name : participantSlots[index];
-        return name + '　' + personTotal(person, quote);
+        return name + '　' + personTotal(index, estimate);
       })
     ].join('\n')),
     '',
@@ -305,8 +372,8 @@ function render() {
     person.train === null ? person.issue : yen(person.train),
     yen(person.board), yen(person.wear), yen(dinner), yen(early)
   ];
-  get('breakdown').innerHTML = costs.map(person => row(person.name, [
-    ...dates.map(quote => personTotal(person, quote)), ...detailValues(person)
+  get('breakdown').innerHTML = costs.map((person, index) => row(person.name, [
+    ...estimates.map(estimate => personTotal(index, estimate)), ...detailValues(person)
   ], dates.length)).join('');
 
   const cards = get('breakdown-cards');
@@ -315,7 +382,7 @@ function render() {
     `<div><dt>${label}</dt><dd>${values[index]}</dd></div>`).join('');
   cards.innerHTML = costs.map((person, index) => `<article>
     <h3>${escapeHtml(person.name)}</h3>
-    <dl class="detail-totals">${lines(['1/15出発の総額', '1/16出発の総額'], dates.map(quote => personTotal(person, quote)))}</dl>
+    <dl class="detail-totals">${lines(['1/15出発の総額', '1/16出発の総額'], estimates.map(estimate => personTotal(index, estimate)))}</dl>
     <details data-slot="${index}"${opened.has(String(index)) ? ' open' : ''}>
       <summary>費用の明細</summary>
       <dl>${lines(detailLabels, detailValues(person))}</dl>
@@ -328,53 +395,25 @@ function render() {
     range((baseDifference - liftSpread) * count, (baseDifference + liftSpread) * count) + ' 安い見込みです。';
 }
 
-const fareIds = ['tokyo', 'omiya', 'ueno'];
+const fareIds = STATIONS;
 const participantFields = ['station', 'board', 'wear'];
 
 function exportInputs({ includeNames = false } = {}) {
   return {
-    version: 3,
+    version: 4,
     fares: Object.fromEntries(fareIds.map(id => [id, get(id).value === '' ? '' : String(get(id).valueAsNumber)])),
     dinner: get('dinner').value,
     early: get('early').checked,
-    participants: participantSlots.map((_, index) => ({
-      name: includeNames ? get('name-' + index).value : '',
+    participants: serializeParticipants(participantSlots.map((_, index) => ({
+      name: get('name-' + index).value,
       ...Object.fromEntries(participantFields.map(field => [field, get(field + '-' + index).value]))
-    }))
+    })), includeNames)
   };
 }
 
-function restoreInputs(data, { includeNames = true } = {}) {
-  const validFare = value => typeof value === 'string' &&
-    (value === '' || (/^[0-9]+$/.test(value) &&
-      Number(value) >= 1 && Number(value) <= 999999));
-  const legacy = data?.version === 1 || data?.version === 2;
-  const source = data?.participants;
-  const participants = legacy && source && typeof source === 'object' && !Array.isArray(source)
-    ? Object.entries(source).map(([name, fields]) => ({ ...fields, name }))
-    : source;
-  const validParticipants = Array.isArray(participants) &&
-    participants.length === participantSlots.length &&
-    participantSlots.every((_, index) => {
-      const participant = participants[index];
-      return typeof participant?.name === 'string' && participant.name.length <= 40 &&
-        !/[\r\n]/.test(participant.name) && participantFields.every(field => {
-          const select = get(field + '-' + index);
-          return Array.from(select.options).some(option => option.value === participant[field]);
-        });
-    });
-  const legacyDinnerIds = ['standard', 'sukiyaki', 'shabu-shabu'];
-  const dinner = data?.version === 1 && Number.isInteger(data.dinner)
-    ? legacyDinnerIds[data.dinner] : data?.dinner;
-  const validDinner = Array.from(get('dinner').options).some(option => option.value === dinner);
-  if ((!legacy && data?.version !== 3) ||
-      (data.version === 1 && !Number.isInteger(data.dinner)) ||
-      !fareIds.every(id => validFare(data.fares?.[id])) ||
-      !validDinner || typeof data.early !== 'boolean' ||
-      !validParticipants) {
-    throw new Error('入力データの形式が一致しません。');
-  }
-
+function restoreInputs(rawData, { includeNames = true } = {}) {
+  const data = validateTripInputs(rawData);
+  const { participants, dinner } = data;
   get('json-include-names').checked = false;
   get('share-include-names').checked = false;
   for (const id of fareIds) get(id).value = data.fares[id];
@@ -516,6 +555,4 @@ loadDraft();
 </script>
 </body>
 </html>
-
-
 
