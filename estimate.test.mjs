@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateTrip, rentalCosts, validateTripInputs, serializeParticipants, RENTALS } from './estimate.mjs';
+import { calculateTrip, januaryQuote, rentalCosts, validateTripInputs, serializeParticipants, RENTALS } from './estimate.mjs';
 
 const dates = [{ base: 11000 }, { base: 16300 }];
 const lift = [4100, 5400];
@@ -57,7 +57,7 @@ const legacy = [
   { ...base, version: 2, dinner: 'shabu-shabu', participants: legacyObject },
   { ...base, version: 3, dinner: 'shabu-shabu', participants: legacyPeople }
 ];
-const expected = { ...base, version: 4, dinner: 'shabu-shabu',
+const expected = { ...base, version: 5, basePrice: 11000, dinner: 'shabu-shabu',
   participants: legacyPeople.map(person => ({ ...person, board: 'upgrade', wear: 'none' })) };
 
 for (const fixture of legacy) {
@@ -97,5 +97,16 @@ test('a second resort can sell lift tickets separately and charge for one rental
   assert.deepEqual(quotes.map(quote => quote.facility), [[9000, 11400], [10000, 10000]]);
   assert.deepEqual(quotes.map(quote => quote.total), [[47000, 49400], [54000, 54000]]);
   assert.deepEqual(quotes[0].individuals, [[23500, 24700], [23500, 24700]]);
+});
+
+test('January selection changes one estimate and round-trips the selected base price', () => {
+  const people = Array.from({ length: 5 }, () => person(13600));
+  const quote = rate => calculateTrip({ dates: [januaryQuote(rate)] }, people, 0)[0];
+  assert.deepEqual(quote(11000).total, [157500, 164000]);
+  assert.deepEqual(quote(19200).total, [198500, 205000]);
+  assert.deepEqual(quote(19200).individuals[0], [39700, 41000]);
+  assert.equal(validateTripInputs({ ...expected, basePrice: 19200 }).basePrice, 19200);
+  assert.equal(validateTripInputs({ ...expected, version: 4 }).basePrice, 11000);
+  assert.throws(() => validateTripInputs({ ...expected, basePrice: 9999 }), /掲載料金/);
 });
 
