@@ -1,0 +1,68 @@
+name: Bootstrap Spec Kit
+on:
+  push:
+    branches: [001-trip-presets]
+    paths: [.github/workflows/bootstrap-speckit.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - name: Initialize the Codex integration
+        run: |
+          if test ! -d .specify; then
+            uvx --from git+https://github.com/github/spec-kit.git@v1.4.5 specify init --here --force --integration codex --ignore-agent-tools --script sh
+          fi
+          test -d .agents/skills/speckit-specify
+      - name: Add the initial feature specification
+        run: |
+          mkdir -p specs/001-trip-presets
+          cat > specs/001-trip-presets/spec.md <<'EOF'
+          # 旅行プランの設定分離
+
+          管理者は旅行の設定をファイルで追加し、同じ画面で複数のスキー場の見積もりを計算できる。
+
+          ## 受け入れ条件
+
+          - 既存の石打丸山の見積もりと JSON v1〜v4 の読み込みが変わらない。
+          - リフト券別売り・レンタル現地払いの別プランでも、個人別と支払先別の合計が総額と一致する。
+          - 候補日、駅、人数、レンタル日数、表示上の支払先はプランの設定に従う。
+          - 下書きはプランごとに独立する。他のプランの JSON を読み込んだ場合は現在の入力を維持する。
+          - 保存と共有は匿名が初期値で、GitHub Pagesに静的ファイルとして配信できる。
+          EOF
+          cat > specs/001-trip-presets/plan.md <<'EOF'
+          # 実装計画
+
+          1. 既存料金を最初のプリセットに移す。候補日別にリフト料金と支払先を定義する。
+          2. プラン設定を選択して、各項目を画面と共有テキストに反映する。
+          3. JSON にプラン ID を導入し、旧版と下書きの互換性を検証する。
+          4. 回帰テストと別プランのテストを実行し、CIで静的ビルドを検証する。
+          EOF
+          cat > specs/001-trip-presets/tasks.md <<'EOF'
+          # タスク
+
+          - [x] T001 石打丸山の料金・日程・レンタルを設定ファイルに抽出する。
+          - [x] T002 別売りリフト券と現地払いレンタルを料金エンジンのテストで確認する。
+          - [ ] T003 画面と共有文から旅行固有のラベルと入力量を分離する。
+          - [ ] T004 プラン選択と保存データのプラン分離を行い、ブラウザで確認する。
+          EOF
+      - name: Verify the existing calculator
+        run: |
+          node --test
+          node build.mjs
+      - name: Commit the generated project files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .specify .agents specs
+          if test -d .codex; then git add .codex; fi
+          if test -f AGENTS.md; then git add AGENTS.md; fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Initialize Spec Kit and document trip presets'
+            git push origin HEAD:refs/heads/001-trip-presets
+          fi

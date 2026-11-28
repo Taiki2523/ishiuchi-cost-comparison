@@ -3,7 +3,9 @@ import { Script } from 'node:vm';
 
 const read = name => readFile(new URL(name, import.meta.url), 'utf8');
 const html = (await read('./index.html')).replace(/\r\n/g, '\n');
-const model = (await read('./estimate.mjs')).replace(/^export /gm, '').trimEnd();
+const config = await read('./trip-config.mjs');
+const engine = (await read('./estimate.mjs')).replace(/^import .*from '\.\/trip-config\.mjs';\r?\n/m, '');
+const model = [config, engine].join('\n').replace(/^export /gm, '').trimEnd();
 const begin = '// BEGIN GENERATED ESTIMATE MODEL';
 const end = '// END GENERATED ESTIMATE MODEL';
 const start = html.indexOf(begin);

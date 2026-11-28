@@ -91,6 +91,12 @@ button:disabled { opacity: .55; cursor: default }
 </header>
 <form id="options" class="controls">
 <div class="card">
+<h2>2027年1月の宿泊プラン料金</h2>
+<label>基本ツアー代（1人あたり） <select id="base-price" aria-describedby="rate-note rate-days"></select></label>
+<p id="rate-days" aria-live="polite"></p>
+<small id="rate-note">トラベルイン「5名以上・室数おまかせ」の2026年11月28日確認時点の掲載額です。日付は参考です。最新の空室・料金は予約カレンダーでご確認ください。</small>
+</div>
+<div class="card">
 <h2>共通の設定</h2>
 <p>新幹線は往復、リフト券とレンタルは2日分で計算します。</p>
 <div class="options">
@@ -134,10 +140,9 @@ button:disabled { opacity: .55; cursor: default }
 </div>
 </form>
 <section class="card table-scroll" tabindex="0" aria-labelledby="resultsTitle">
-<h2 id="resultsTitle">日程別の見積もり</h2>
-<p id="difference" aria-live="polite"></p>
+<h2 id="resultsTitle">見積もり</h2>
 <table>
-<thead><tr><th scope="col">参加者</th><th scope="col">1/15（金）〜1/16（土）</th><th scope="col">1/16（土）〜1/17（日）</th></tr></thead>
+<thead><tr><th scope="col">参加者</th><th scope="col">総額</th></tr></thead>
 <tbody id="individual"></tbody>
 <tfoot id="total"></tfoot>
 </table>
@@ -151,10 +156,10 @@ button:disabled { opacity: .55; cursor: default }
 </section>
 <section class="card" aria-labelledby="payment-title">
 <h2 id="payment-title">支払先ごとの内訳</h2>
-<p>両日程の5人分。リフト2日券への追加額は概算です。</p>
+<p>選んだ料金での5人分。リフト2日券への追加額は概算です。</p>
 <div class="table-scroll" tabindex="0" aria-label="支払先別の費用">
 <table>
-<thead><tr><th scope="col">支払先</th><th scope="col">1/15出発</th><th scope="col">1/16出発</th></tr></thead>
+<thead><tr><th scope="col">支払先</th><th scope="col">金額</th></tr></thead>
 <tbody id="payments"></tbody>
 <tfoot id="payments-total"></tfoot>
 </table>
@@ -167,7 +172,7 @@ button:disabled { opacity: .55; cursor: default }
 <div id="breakdown-cards" class="detail-cards"></div>
 <div class="table-scroll desktop-breakdown" tabindex="0" aria-label="参加者別の総額と費用内訳">
 <table>
-<thead><tr><th scope="col">参加者</th><th scope="col">1/15出発の総額</th><th scope="col">1/16出発の総額</th><th scope="col">1/15の基本ツアー代</th><th scope="col">1/16の基本ツアー代</th><th scope="col">リフト2日券の追加</th><th scope="col">新幹線往復</th><th scope="col">ボード2日分</th><th scope="col">ウェア2日分</th><th scope="col">夕食追加</th><th scope="col">アーリーチェックイン</th></tr></thead>
+<thead><tr><th scope="col">参加者</th><th scope="col">総額</th><th scope="col">基本ツアー代</th><th scope="col">リフト2日券の追加</th><th scope="col">新幹線往復</th><th scope="col">ボード2日分</th><th scope="col">ウェア2日分</th><th scope="col">夕食追加</th><th scope="col">アーリーチェックイン</th></tr></thead>
 <tbody id="breakdown"></tbody>
 </table>
 </div>
@@ -180,11 +185,32 @@ button:disabled { opacity: .55; cursor: default }
 </main>
 <script>
 // BEGIN GENERATED ESTIMATE MODEL
-const RENTAL_DAYS = 2;
-const RENTALS = {
-  board: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2500, payee: 'rental' } },
-  wear: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2000, payee: 'rental' } }
+const ISHIUCHI_2027 = {
+  id: 'ishiuchi-2027-01',
+  title: '石打丸山 SNOW TRIP',
+  shareTitle: '石打丸山 SNOW TRIP｜2027年1月の見積もり',
+  // Travel Inn, 5名以上室数おまかせ. Snapshot checked on 2026-11-28.
+  januaryRates: [
+    { base: 11000, days: [5, 6, 7, 8, 12, 13, 14, 15, 18, 19, 20, 21, 22, 25, 26, 27, 28, 29] },
+    { base: 11900, days: [4] },
+    { base: 12300, days: [11, 17, 24] },
+    { base: 13100, days: [31] },
+    { base: 14400, days: [3] },
+    { base: 16300, days: [1, 2, 16, 23] },
+    { base: 18200, days: [10] },
+    { base: 19200, days: [9] }
+  ],
+  lift: [4100, 5400],
+  liftPayee: 'tour',
+  rentalDays: 2,
+  rentals: {
+    board: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2500, payee: 'rental' } },
+    wear: { none: { daily: 0, payee: 'tour' }, basic: { daily: 700, payee: 'tour' }, upgrade: { daily: 2000, payee: 'rental' } }
+  }
 };
+
+
+const RENTALS = ISHIUCHI_2027.rentals;
 const LEGACY_RENTALS = {
   board: { '0': 'none', '700': 'basic', '2500': 'upgrade' },
   wear: { '0': 'none', '700': 'basic', '2000': 'upgrade' }
@@ -193,35 +219,49 @@ const STATIONS = ['tokyo', 'omiya', 'ueno'];
 const DINNERS = ['standard', 'sukiyaki', 'shabu-shabu'];
 const PARTICIPANT_COUNT = 5;
 
-function rentalCosts(boardId, wearId, rates = RENTALS) {
+function rentalCosts(boardId, wearId, rates = RENTALS, days = ISHIUCHI_2027.rentalDays) {
   const board = rates.board[boardId];
   const wear = rates.wear[wearId];
-  const byPayee = { tour: 0, rental: 0 };
-  for (const item of [board, wear]) byPayee[item.payee] += item.daily * RENTAL_DAYS;
-  return { board: board.daily * RENTAL_DAYS, wear: wear.daily * RENTAL_DAYS, byPayee };
+  const byPayee = { tour: 0, rental: 0, facility: 0 };
+  for (const item of [board, wear]) byPayee[item.payee] += item.daily * days;
+  return { board: board.daily * days, wear: wear.daily * days, byPayee };
 }
 
-function calculateEstimate(dates, lift, participants, onsite) {
+function calculateTrip(plan, participants, onsite) {
   const count = participants.length;
   const sum = getAmount => participants.reduce((total, person) => total + getAmount(person), 0);
   const train = participants.every(person => person.train !== null) ? sum(person => person.train) : null;
-  const rental = sum(person => person.byPayee.rental);
-  const tourRentals = sum(person => person.byPayee.tour);
-  return dates.map(({ base }) => {
-    const tour = lift.map(extra => (base + extra) * count + tourRentals);
-    const facility = onsite * count;
+  const rentals = {
+    tour: sum(person => person.byPayee.tour),
+    rental: sum(person => person.byPayee.rental),
+    facility: sum(person => person.byPayee.facility)
+  };
+
+  return plan.dates.map(({ base, lift, liftPayee }) => {
+    const payment = {
+      tour: lift.map(extra => base * count + rentals.tour + (liftPayee === 'tour' ? extra * count : 0)),
+      rental: lift.map(extra => rentals.rental + (liftPayee === 'rental' ? extra * count : 0)),
+      facility: lift.map(extra => onsite * count + rentals.facility + (liftPayee === 'facility' ? extra * count : 0))
+    };
     return {
-      tour, rental, facility, train,
-      total: train === null ? null : tour.map(amount => amount + rental + facility + train),
+      ...payment, train,
+      total: train === null ? null : lift.map((_, index) =>
+        payment.tour[index] + payment.rental[index] + payment.facility[index] + train),
       individuals: participants.map(person => person.train === null ? null :
         lift.map(extra => base + extra + person.train + person.board + person.wear + onsite))
     };
   });
 }
 
+function januaryQuote(base) {
+  const price = ISHIUCHI_2027.januaryRates.find(rate => rate.base === base);
+  if (!price) throw new Error('掲載料金を選択してください。');
+  return { ...price, lift: ISHIUCHI_2027.lift, liftPayee: ISHIUCHI_2027.liftPayee };
+}
+
 function validateTripInputs(data) {
   const invalid = () => { throw new Error('入力データの形式が一致しません。'); };
-  if (!data || ![1, 2, 3, 4].includes(data.version) || typeof data.early !== 'boolean') invalid();
+  if (!data || ![1, 2, 3, 4, 5].includes(data.version) || typeof data.early !== 'boolean') invalid();
   const validFare = value => typeof value === 'string' &&
     (value === '' || (/^[0-9]+$/.test(value) && Number(value) >= 1 && Number(value) <= 999999));
   if (!STATIONS.every(id => validFare(data.fares?.[id]))) invalid();
@@ -244,7 +284,9 @@ function validateTripInputs(data) {
           !Object.hasOwn(LEGACY_RENTALS.wear, person.wear)))) invalid();
     return { name: person.name, station: person.station, board, wear };
   });
-  return { version: 4, fares: data.fares, dinner, early: data.early, participants };
+  const basePrice = data.version === 5 ? data.basePrice : ISHIUCHI_2027.januaryRates[0].base;
+  januaryQuote(basePrice);
+  return { version: 5, basePrice, fares: data.fares, dinner, early: data.early, participants };
 }
 
 function serializeParticipants(participants, includeNames = false) {
@@ -253,11 +295,13 @@ function serializeParticipants(participants, includeNames = false) {
 // END GENERATED ESTIMATE MODEL
 const get = id => document.getElementById(id);
 const participantSlots = Array.from({ length: PARTICIPANT_COUNT }, (_, index) => '参加者' + (index + 1));
-const dates = [{ base: 11000 }, { base: 16300 }];
-const liftSurcharge = [4100, 5400];
+const plan = ISHIUCHI_2027;
 const number = new Intl.NumberFormat('ja-JP');
 const yen = amount => number.format(amount) + '円';
 const range = (min, max) => min === max ? yen(min) : number.format(min) + '〜' + yen(max);
+
+get('base-price').innerHTML = plan.januaryRates.map(({ base }) =>
+  `<option value="${base}">${yen(base)}</option>`).join('');
 
 const rentalOptions = rates => [
   `<option value="basic">通常 ${yen(rates.basic.daily)}</option>`,
@@ -311,17 +355,18 @@ function render() {
     return { name, station, train, issue, ...rentals };
   });
 
-  const estimates = calculateEstimate(dates, liftSurcharge, costs, dinner + early);
-  const personTotal = (index, estimate) => {
+  const quote = januaryQuote(Number(get('base-price').value));
+  get('rate-days').textContent = '参考の出発日：' + quote.days.map(day => '1/' + day).join('、');
+  const [estimate] = calculateTrip({ dates: [quote] }, costs, dinner + early);
+  const personTotal = index => {
     const amount = estimate.individuals[index];
     return amount === null ? costs[index].issue : range(...amount);
   };
-  const groupTotals = estimates.map(estimate => estimate.total === null ? '入力待ち' : range(...estimate.total));
-  const allReady = estimates.every(estimate => estimate.total !== null);
-  const count = costs.length;
+  const allReady = estimate.total !== null;
+  const groupTotal = allReady ? range(...estimate.total) : '入力待ち';
   get('individual').innerHTML = costs.map((person, index) =>
-    row(person.name, estimates.map(estimate => personTotal(index, estimate)))).join('');
-  get('total').innerHTML = row('5人合計', groupTotals);
+    row(person.name, [personTotal(index)])).join('');
+  get('total').innerHTML = row('5人合計', [groupTotal]);
 
   const missingStations = costs.filter(person => !person.station).map(person => person.name);
   const stationLabels = { tokyo: '東京', omiya: '大宮', ueno: '上野' };
@@ -335,10 +380,10 @@ function render() {
   readiness.hidden = allReady;
 
   const paymentRows = [
-    row('トラベルイン（ツアー・リフト・通常レンタル）', estimates.map(estimate => range(...estimate.tour))),
-    row('レンタル専用サイト（アップグレード）', estimates.map(estimate => yen(estimate.rental))),
-    row('宿泊施設で現地払い（夕食変更・早着）', estimates.map(estimate => yen(estimate.facility))),
-    row('新幹線（往復）', estimates.map(estimate => estimate.train === null ? '入力待ち' : yen(estimate.train)))
+    row('トラベルイン（ツアー・リフト・通常レンタル）', [range(...estimate.tour)]),
+    row('レンタル専用サイト（アップグレード）', [range(...estimate.rental)]),
+    row('宿泊施設で現地払い（夕食変更・早着）', [range(...estimate.facility)]),
+    row('新幹線（往復）', [allReady ? yen(estimate.train) : '入力待ち'])
   ];
   get('payments').innerHTML = paymentRows.join('');
   get('payments-total').innerHTML = get('total').innerHTML;
@@ -348,33 +393,30 @@ function render() {
   get('share-status').textContent = '';
   get('share-fallback').hidden = true;
   shareText = allReady ? [
-    '石打丸山 SNOW TRIP｜2027年1月の見積もり',
-    ...estimates.map((estimate, index) => [
-      '',
-      index === 0 ? '1/15（金）〜1/16（土）' : '1/16（土）〜1/17（日）',
-      '5人合計 ' + groupTotals[index],
-      ...costs.map((person, index) => {
-        const name = get('share-include-names').checked ? person.name : participantSlots[index];
-        return name + '　' + personTotal(index, estimate);
-      })
-    ].join('\n')),
+    plan.shareTitle,
+    '基本ツアー代（1人） ' + yen(quote.base),
+    '5人合計 ' + groupTotal,
+    ...costs.map((person, index) => {
+      const name = get('share-include-names').checked ? person.name : participantSlots[index];
+      return name + '　' + personTotal(index);
+    }),
     '',
     '※リフト2日券の追加額が未確定のため概算。昼食・小物レンタル・駅からの移動費は別途。'
   ].join('\n') : '';
 
   const detailLabels = [
-    '1/15の基本ツアー代', '1/16の基本ツアー代', 'リフト2日券の追加',
+    '基本ツアー代', 'リフト2日券の追加',
     '新幹線往復', 'ボード2日分', 'ウェア2日分', '夕食追加', 'アーリーチェックイン'
   ];
   const detailValues = person => [
-    ...dates.map(quote => yen(quote.base)),
-    range(...liftSurcharge),
+    yen(quote.base),
+    range(...quote.lift),
     person.train === null ? person.issue : yen(person.train),
     yen(person.board), yen(person.wear), yen(dinner), yen(early)
   ];
   get('breakdown').innerHTML = costs.map((person, index) => row(person.name, [
-    ...estimates.map(estimate => personTotal(index, estimate)), ...detailValues(person)
-  ], dates.length)).join('');
+    personTotal(index), ...detailValues(person)
+  ], 1)).join('');
 
   const cards = get('breakdown-cards');
   const opened = new Set(Array.from(cards.querySelectorAll('details[open]'), item => item.dataset.slot));
@@ -382,17 +424,14 @@ function render() {
     `<div><dt>${label}</dt><dd>${values[index]}</dd></div>`).join('');
   cards.innerHTML = costs.map((person, index) => `<article>
     <h3>${escapeHtml(person.name)}</h3>
-    <dl class="detail-totals">${lines(['1/15出発の総額', '1/16出発の総額'], estimates.map(estimate => personTotal(index, estimate)))}</dl>
+    <dl class="detail-totals">${lines(['総額'], [personTotal(index)])}</dl>
     <details data-slot="${index}"${opened.has(String(index)) ? ' open' : ''}>
       <summary>費用の明細</summary>
       <dl>${lines(detailLabels, detailValues(person))}</dl>
     </details>
   </article>`).join('');
 
-  const baseDifference = dates[1].base - dates[0].base;
-  const liftSpread = liftSurcharge[1] - liftSurcharge[0];
-  get('difference').textContent = '1/15出発のほうが、5人で ' +
-    range((baseDifference - liftSpread) * count, (baseDifference + liftSpread) * count) + ' 安い見込みです。';
+
 }
 
 const fareIds = STATIONS;
@@ -400,7 +439,8 @@ const participantFields = ['station', 'board', 'wear'];
 
 function exportInputs({ includeNames = false } = {}) {
   return {
-    version: 4,
+    version: 5,
+    basePrice: Number(get('base-price').value),
     fares: Object.fromEntries(fareIds.map(id => [id, get(id).value === '' ? '' : String(get(id).valueAsNumber)])),
     dinner: get('dinner').value,
     early: get('early').checked,
@@ -414,6 +454,7 @@ function exportInputs({ includeNames = false } = {}) {
 function restoreInputs(rawData, { includeNames = true } = {}) {
   const data = validateTripInputs(rawData);
   const { participants, dinner } = data;
+  get('base-price').value = String(data.basePrice);
   get('json-include-names').checked = false;
   get('share-include-names').checked = false;
   for (const id of fareIds) get(id).value = data.fares[id];
