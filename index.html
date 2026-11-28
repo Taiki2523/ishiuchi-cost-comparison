@@ -118,7 +118,7 @@ button:disabled { opacity: .55; cursor: default }
 <label class="fare-field"><span>上野駅の片道（円）</span><input class="price-input" id="ueno" type="number" min="1" max="999999" step="1" value="6590" required></label>
 </div>
 <small>片道運賃は駅ごとに変更できます。往復分は片道運賃の2倍で計算します。</small>
-<p><strong>リフト2日券付き（全員）</strong><br><small>基本ツアー代には初日のリフト券が含まれます。2日券への変更額は、日程別の確定額が未確認のため、1人4,100〜5,400円を自動で加算します。</small></p>
+<p><strong>リフト2日券付き（全員）</strong><br><small>基本ツアー代には初日のリフト券が含まれます。2日券への変更額は、1人5,400円を自動で加算します。</small></p>
 <fieldset>
 <legend>夕食アップグレード（グループ単位）</legend>
 <label>5人共通 <select id="dinner">
@@ -169,7 +169,7 @@ button:disabled { opacity: .55; cursor: default }
 </section>
 <section class="card" aria-labelledby="payment-title">
 <h2 id="payment-title">支払先ごとの内訳</h2>
-<p>選んだ料金での5人分。リフト2日券への追加額は概算です。</p>
+<p>選んだ料金での5人分。リフト2日券への変更は5人で27,000円です。</p>
 <div class="table-scroll" tabindex="0" aria-label="支払先別の費用">
 <table>
 <thead><tr><th scope="col">支払先</th><th scope="col">金額</th></tr></thead>
@@ -213,7 +213,7 @@ const ISHIUCHI_2027 = {
     { base: 18200, days: [10] },
     { base: 19200, days: [9] }
   ],
-  lift: [4100, 5400],
+  lift: [5400, 5400],
   liftPayee: 'tour',
   rentalDays: 2,
   rentals: {
@@ -440,7 +440,7 @@ function render() {
       return name + '　' + personTotal(index);
     }),
     '',
-    '※リフト2日券の追加額が未確定のため概算。昼食・小物レンタル・駅からの移動費は別途。'
+    '※リフト2日券への変更は1人5,400円を計上。昼食・小物レンタル・駅からの移動費は別途。'
   ].join('\n') : '';
 
   const detailLabels = [

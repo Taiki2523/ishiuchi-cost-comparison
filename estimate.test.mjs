@@ -102,9 +102,9 @@ test('a second resort can sell lift tickets separately and charge for one rental
 test('January selection changes one estimate and round-trips the selected base price', () => {
   const people = Array.from({ length: 5 }, () => person(13600));
   const quote = rate => calculateTrip({ dates: [januaryQuote(rate)] }, people, 0)[0];
-  assert.deepEqual(quote(11000).total, [157500, 164000]);
-  assert.deepEqual(quote(19200).total, [198500, 205000]);
-  assert.deepEqual(quote(19200).individuals[0], [39700, 41000]);
+  assert.deepEqual(quote(11000).total, [164000, 164000]);
+  assert.deepEqual(quote(19200).total, [205000, 205000]);
+  assert.deepEqual(quote(19200).individuals[0], [41000, 41000]);
   assert.equal(validateTripInputs({ ...expected, version: 5, basePrice: 19200 }).basePrice, 19200);
   assert.equal(validateTripInputs({ ...expected, version: 4 }).basePrice, 11000);
   assert.throws(() => validateTripInputs({ ...expected, version: 5, basePrice: 9999 }), /掲載料金/);
