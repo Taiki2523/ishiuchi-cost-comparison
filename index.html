@@ -118,7 +118,7 @@ button:disabled { opacity: .55; cursor: default }
 <label class="fare-field"><span>上野駅の片道（円）</span><input class="price-input" id="ueno" type="number" min="1" max="999999" step="1" value="6590" required></label>
 </div>
 <small>片道運賃は駅ごとに変更できます。往復分は片道運賃の2倍で計算します。</small>
-<p><strong>リフト2日券付き（全員）</strong><br><small>基本ツアー代には初日のリフト券が含まれます。2日券への変更額は、1人5,400円を自動で加算します。</small></p>
+<p><strong>リフト2日券付き（全員）</strong><br><small>基本ツアー代には初日のリフト券が含まれます。2日券への変更額は、1人5,400円を自動で加算します。傷害保険（必須）は1人500円です。</small></p>
 <fieldset>
 <legend>夕食アップグレード（グループ単位）</legend>
 <label>5人共通 <select id="dinner">
@@ -185,7 +185,7 @@ button:disabled { opacity: .55; cursor: default }
 <div id="breakdown-cards" class="detail-cards"></div>
 <div class="table-scroll desktop-breakdown" tabindex="0" aria-label="参加者別の総額と費用内訳">
 <table>
-<thead><tr><th scope="col">参加者</th><th scope="col">総額</th><th scope="col">基本ツアー代</th><th scope="col">リフト2日券の追加</th><th scope="col">新幹線往復</th><th scope="col">ボード2日分</th><th scope="col">ウェア2日分</th><th scope="col">夕食追加</th><th scope="col">アーリーチェックイン</th></tr></thead>
+<thead><tr><th scope="col">参加者</th><th scope="col">総額</th><th scope="col">基本ツアー代</th><th scope="col">リフト2日券の追加</th><th scope="col">傷害保険（必須）</th><th scope="col">新幹線往復</th><th scope="col">ボード2日分</th><th scope="col">ウェア2日分</th><th scope="col">夕食追加</th><th scope="col">アーリーチェックイン</th></tr></thead>
 <tbody id="breakdown"></tbody>
 </table>
 </div>
@@ -213,6 +213,7 @@ const ISHIUCHI_2027 = {
     { base: 18200, days: [10] },
     { base: 19200, days: [9] }
   ],
+  insurance: 500,
   lift: [5400, 5400],
   liftPayee: 'tour',
   rentalDays: 2,
@@ -250,9 +251,9 @@ function calculateTrip(plan, participants, onsite) {
     facility: sum(person => person.byPayee.facility)
   };
 
-  return plan.dates.map(({ base, lift, liftPayee }) => {
+  return plan.dates.map(({ base, lift, liftPayee, insurance = 0 }) => {
     const payment = {
-      tour: lift.map(extra => base * count + rentals.tour + (liftPayee === 'tour' ? extra * count : 0)),
+      tour: lift.map(extra => (base + insurance) * count + rentals.tour + (liftPayee === 'tour' ? extra * count : 0)),
       rental: lift.map(extra => rentals.rental + (liftPayee === 'rental' ? extra * count : 0)),
       facility: lift.map(extra => onsite * count + rentals.facility + (liftPayee === 'facility' ? extra * count : 0))
     };
@@ -261,7 +262,7 @@ function calculateTrip(plan, participants, onsite) {
       total: train === null ? null : lift.map((_, index) =>
         payment.tour[index] + payment.rental[index] + payment.facility[index] + train),
       individuals: participants.map(person => person.train === null ? null :
-        lift.map(extra => base + extra + person.train + person.board + person.wear + onsite))
+        lift.map(extra => base + insurance + extra + person.train + person.board + person.wear + onsite))
     };
   });
 }
@@ -269,7 +270,7 @@ function calculateTrip(plan, participants, onsite) {
 function januaryQuote(base) {
   const price = ISHIUCHI_2027.januaryRates.find(rate => rate.base === base);
   if (!price) throw new Error('掲載料金を選択してください。');
-  return { ...price, lift: ISHIUCHI_2027.lift, liftPayee: ISHIUCHI_2027.liftPayee };
+  return { ...price, insurance: ISHIUCHI_2027.insurance, lift: ISHIUCHI_2027.lift, liftPayee: ISHIUCHI_2027.liftPayee };
 }
 
 function januaryDeparture(day) {
@@ -418,7 +419,7 @@ function render() {
   readiness.hidden = allReady;
 
   const paymentRows = [
-    row('トラベルイン（ツアー・リフト・通常レンタル）', [range(...estimate.tour)]),
+    row('トラベルイン（ツアー・リフト・通常レンタル・保険）', [range(...estimate.tour)]),
     row('レンタル専用サイト（アップグレード）', [range(...estimate.rental)]),
     row('宿泊施設で現地払い（夕食変更・早着）', [range(...estimate.facility)]),
     row('新幹線（往復）', [allReady ? yen(estimate.train) : '入力待ち'])
@@ -440,16 +441,17 @@ function render() {
       return name + '　' + personTotal(index);
     }),
     '',
-    '※リフト2日券への変更は1人5,400円を計上。昼食・小物レンタル・駅からの移動費は別途。'
+    '※リフト2日券への変更は1人5,400円、傷害保険は1人500円を計上。昼食・小物レンタル・駅からの移動費は別途。'
   ].join('\n') : '';
 
   const detailLabels = [
-    '基本ツアー代', 'リフト2日券の追加',
+    '基本ツアー代', 'リフト2日券の追加', '傷害保険（必須）',
     '新幹線往復', 'ボード2日分', 'ウェア2日分', '夕食追加', 'アーリーチェックイン'
   ];
   const detailValues = person => [
     yen(quote.base),
     range(...quote.lift),
+    yen(quote.insurance),
     person.train === null ? person.issue : yen(person.train),
     yen(person.board), yen(person.wear), yen(dinner), yen(early)
   ];

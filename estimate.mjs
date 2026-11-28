@@ -27,9 +27,9 @@ export function calculateTrip(plan, participants, onsite) {
     facility: sum(person => person.byPayee.facility)
   };
 
-  return plan.dates.map(({ base, lift, liftPayee }) => {
+  return plan.dates.map(({ base, lift, liftPayee, insurance = 0 }) => {
     const payment = {
-      tour: lift.map(extra => base * count + rentals.tour + (liftPayee === 'tour' ? extra * count : 0)),
+      tour: lift.map(extra => (base + insurance) * count + rentals.tour + (liftPayee === 'tour' ? extra * count : 0)),
       rental: lift.map(extra => rentals.rental + (liftPayee === 'rental' ? extra * count : 0)),
       facility: lift.map(extra => onsite * count + rentals.facility + (liftPayee === 'facility' ? extra * count : 0))
     };
@@ -38,7 +38,7 @@ export function calculateTrip(plan, participants, onsite) {
       total: train === null ? null : lift.map((_, index) =>
         payment.tour[index] + payment.rental[index] + payment.facility[index] + train),
       individuals: participants.map(person => person.train === null ? null :
-        lift.map(extra => base + extra + person.train + person.board + person.wear + onsite))
+        lift.map(extra => base + insurance + extra + person.train + person.board + person.wear + onsite))
     };
   });
 }
@@ -46,7 +46,7 @@ export function calculateTrip(plan, participants, onsite) {
 export function januaryQuote(base) {
   const price = ISHIUCHI_2027.januaryRates.find(rate => rate.base === base);
   if (!price) throw new Error('掲載料金を選択してください。');
-  return { ...price, lift: ISHIUCHI_2027.lift, liftPayee: ISHIUCHI_2027.liftPayee };
+  return { ...price, insurance: ISHIUCHI_2027.insurance, lift: ISHIUCHI_2027.lift, liftPayee: ISHIUCHI_2027.liftPayee };
 }
 
 export function januaryDeparture(day) {

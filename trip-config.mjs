@@ -13,6 +13,7 @@ export const ISHIUCHI_2027 = {
     { base: 18200, days: [10] },
     { base: 19200, days: [9] }
   ],
+  insurance: 500,
   lift: [5400, 5400],
   liftPayee: 'tour',
   rentalDays: 2,
