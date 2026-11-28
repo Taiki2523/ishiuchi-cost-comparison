@@ -49,9 +49,15 @@ export function januaryQuote(base) {
   return { ...price, lift: ISHIUCHI_2027.lift, liftPayee: ISHIUCHI_2027.liftPayee };
 }
 
+export function januaryDeparture(day) {
+  const rate = ISHIUCHI_2027.januaryRates.find(entry => entry.days.includes(day));
+  if (!rate) throw new Error('掲載料金がある出発日を選択してください。');
+  return { ...januaryQuote(rate.base), day };
+}
+
 export function validateTripInputs(data) {
   const invalid = () => { throw new Error('入力データの形式が一致しません。'); };
-  if (!data || ![1, 2, 3, 4, 5].includes(data.version) || typeof data.early !== 'boolean') invalid();
+  if (!data || ![1, 2, 3, 4, 5, 6].includes(data.version) || typeof data.early !== 'boolean') invalid();
   const validFare = value => typeof value === 'string' &&
     (value === '' || (/^[0-9]+$/.test(value) && Number(value) >= 1 && Number(value) <= 999999));
   if (!STATIONS.every(id => validFare(data.fares?.[id]))) invalid();
@@ -74,9 +80,12 @@ export function validateTripInputs(data) {
           !Object.hasOwn(LEGACY_RENTALS.wear, person.wear)))) invalid();
     return { name: person.name, station: person.station, board, wear };
   });
-  const basePrice = data.version === 5 ? data.basePrice : ISHIUCHI_2027.januaryRates[0].base;
-  januaryQuote(basePrice);
-  return { version: 5, basePrice, fares: data.fares, dinner, early: data.early, participants };
+  const quote = data.version === 6
+    ? januaryDeparture(data.departureDay)
+    : januaryDeparture(januaryQuote(data.version === 5
+      ? data.basePrice : ISHIUCHI_2027.januaryRates[0].base).days[0]);
+  return { version: 6, departureDay: quote.day, basePrice: quote.base,
+    fares: data.fares, dinner, early: data.early, participants };
 }
 
 export function serializeParticipants(participants, includeNames = false) {

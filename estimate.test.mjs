@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateTrip, januaryQuote, rentalCosts, validateTripInputs, serializeParticipants, RENTALS } from './estimate.mjs';
+import { calculateTrip, januaryQuote, januaryDeparture, rentalCosts, validateTripInputs, serializeParticipants, RENTALS } from './estimate.mjs';
 
 const dates = [{ base: 11000 }, { base: 16300 }];
 const lift = [4100, 5400];
@@ -57,7 +57,7 @@ const legacy = [
   { ...base, version: 2, dinner: 'shabu-shabu', participants: legacyObject },
   { ...base, version: 3, dinner: 'shabu-shabu', participants: legacyPeople }
 ];
-const expected = { ...base, version: 5, basePrice: 11000, dinner: 'shabu-shabu',
+const expected = { ...base, version: 6, departureDay: 5, basePrice: 11000, dinner: 'shabu-shabu',
   participants: legacyPeople.map(person => ({ ...person, board: 'upgrade', wear: 'none' })) };
 
 for (const fixture of legacy) {
@@ -105,8 +105,20 @@ test('January selection changes one estimate and round-trips the selected base p
   assert.deepEqual(quote(11000).total, [157500, 164000]);
   assert.deepEqual(quote(19200).total, [198500, 205000]);
   assert.deepEqual(quote(19200).individuals[0], [39700, 41000]);
-  assert.equal(validateTripInputs({ ...expected, basePrice: 19200 }).basePrice, 19200);
+  assert.equal(validateTripInputs({ ...expected, version: 5, basePrice: 19200 }).basePrice, 19200);
   assert.equal(validateTripInputs({ ...expected, version: 4 }).basePrice, 11000);
-  assert.throws(() => validateTripInputs({ ...expected, basePrice: 9999 }), /掲載料金/);
+  assert.throws(() => validateTripInputs({ ...expected, version: 5, basePrice: 9999 }), /掲載料金/);
+});
+
+test('departure day resolves its published price and survives JSON restoration', () => {
+  assert.equal(januaryDeparture(16).base, 16300);
+  assert.equal(januaryDeparture(31).base, 13100);
+  assert.throws(() => januaryDeparture(30), /出発日/);
+  assert.throws(() => januaryDeparture('16'), /出発日/);
+  const saved = validateTripInputs({ ...expected, departureDay: 22 });
+  assert.equal(saved.departureDay, 22);
+  assert.equal(saved.basePrice, 11000);
+  assert.equal(validateTripInputs({ ...expected, version: 5, basePrice: 16300 }).departureDay, 1);
+  assert.throws(() => validateTripInputs({ ...expected, departureDay: 30 }), /出発日/);
 });
 

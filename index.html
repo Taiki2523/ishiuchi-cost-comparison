@@ -81,6 +81,16 @@ button:disabled { opacity: .55; cursor: default }
   .desktop-breakdown { display: none }
   .detail-cards { display: block }
 }
+.calendar { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; margin-top: 8px }
+.calendar-weekday { text-align: center; font-size: .875rem }
+.calendar-choice { position: relative; display: block; min-width: 0; min-height: 0; margin: 0 }
+.calendar-choice input { position: absolute; width: 1px; height: 1px; opacity: 0 }
+.calendar-day { display: grid; align-content: center; justify-items: center; min-height: 56px; padding: 3px 0; border: 1px solid var(--line); border-radius: 6px; font-size: clamp(9px,2.5vw,14px); white-space: nowrap }
+.calendar-choice .calendar-day { cursor: pointer }
+.calendar-day strong { font-size: .95rem }
+.calendar-choice input:checked + .calendar-day { background: var(--house); color: white; border-color: var(--house) }
+.calendar-choice input:focus-visible + .calendar-day { outline: 2px solid var(--accent); outline-offset: 1px }
+.calendar-unavailable { background: var(--canvas); color: var(--muted) }
 </style>
 </head>
 <body>
@@ -92,9 +102,12 @@ button:disabled { opacity: .55; cursor: default }
 <form id="options" class="controls">
 <div class="card">
 <h2>2027年1月の宿泊プラン料金</h2>
-<label>基本ツアー代（1人あたり） <select id="base-price" aria-describedby="rate-note rate-days"></select></label>
+<fieldset aria-describedby="rate-note">
+<legend>出発日を選択（1泊2日・料金は1人あたり）</legend>
+<div class="calendar" id="january-calendar"></div>
+</fieldset>
 <p id="rate-days" aria-live="polite"></p>
-<small id="rate-note">トラベルイン「5名以上・室数おまかせ」の2026年11月28日確認時点の掲載額です。日付は参考です。最新の空室・料金は予約カレンダーでご確認ください。</small>
+<small id="rate-note">トラベルイン「5名以上・室数おまかせ」の2026年11月28日確認時点の掲載額です。料金の掲載がない日は選べません。最新の空室・料金は予約カレンダーでご確認ください。</small>
 </div>
 <div class="card">
 <h2>共通の設定</h2>
@@ -259,9 +272,15 @@ function januaryQuote(base) {
   return { ...price, lift: ISHIUCHI_2027.lift, liftPayee: ISHIUCHI_2027.liftPayee };
 }
 
+function januaryDeparture(day) {
+  const rate = ISHIUCHI_2027.januaryRates.find(entry => entry.days.includes(day));
+  if (!rate) throw new Error('掲載料金がある出発日を選択してください。');
+  return { ...januaryQuote(rate.base), day };
+}
+
 function validateTripInputs(data) {
   const invalid = () => { throw new Error('入力データの形式が一致しません。'); };
-  if (!data || ![1, 2, 3, 4, 5].includes(data.version) || typeof data.early !== 'boolean') invalid();
+  if (!data || ![1, 2, 3, 4, 5, 6].includes(data.version) || typeof data.early !== 'boolean') invalid();
   const validFare = value => typeof value === 'string' &&
     (value === '' || (/^[0-9]+$/.test(value) && Number(value) >= 1 && Number(value) <= 999999));
   if (!STATIONS.every(id => validFare(data.fares?.[id]))) invalid();
@@ -284,9 +303,12 @@ function validateTripInputs(data) {
           !Object.hasOwn(LEGACY_RENTALS.wear, person.wear)))) invalid();
     return { name: person.name, station: person.station, board, wear };
   });
-  const basePrice = data.version === 5 ? data.basePrice : ISHIUCHI_2027.januaryRates[0].base;
-  januaryQuote(basePrice);
-  return { version: 5, basePrice, fares: data.fares, dinner, early: data.early, participants };
+  const quote = data.version === 6
+    ? januaryDeparture(data.departureDay)
+    : januaryDeparture(januaryQuote(data.version === 5
+      ? data.basePrice : ISHIUCHI_2027.januaryRates[0].base).days[0]);
+  return { version: 6, departureDay: quote.day, basePrice: quote.base,
+    fares: data.fares, dinner, early: data.early, participants };
 }
 
 function serializeParticipants(participants, includeNames = false) {
@@ -300,8 +322,23 @@ const number = new Intl.NumberFormat('ja-JP');
 const yen = amount => number.format(amount) + '円';
 const range = (min, max) => min === max ? yen(min) : number.format(min) + '〜' + yen(max);
 
-get('base-price').innerHTML = plan.januaryRates.map(({ base }) =>
-  `<option value="${base}">${yen(base)}</option>`).join('');
+const calendar = get('january-calendar');
+const defaultDeparture = plan.januaryRates[0].days[0];
+const ratesByDay = new Map(plan.januaryRates.flatMap(rate => rate.days.map(day => [day, rate.base])));
+calendar.innerHTML = ['日', '月', '火', '水', '木', '金', '土']
+  .map(day => `<span class="calendar-weekday" aria-hidden="true">${day}</span>`).join('') +
+  '<span aria-hidden="true"></span>'.repeat(5) +
+  Array.from({ length: 31 }, (_, index) => {
+    const day = index + 1;
+    const base = ratesByDay.get(day);
+    if (base === undefined) {
+      return `<span class="calendar-day calendar-unavailable" aria-label="1月${day}日 選択不可"><strong>${day}</strong><span>—</span></span>`;
+    }
+    return `<label class="calendar-choice"><input type="radio" name="departure" value="${day}" id="departure-${day}"
+      aria-label="1月${day}日 ${yen(base)}"${day === defaultDeparture ? ' checked' : ''}>
+      <span class="calendar-day"><strong>${day}</strong><span>${yen(base)}</span></span></label>`;
+  }).join('');
+const selectedDeparture = () => Number(get('options').elements.namedItem('departure').value);
 
 const rentalOptions = rates => [
   `<option value="basic">通常 ${yen(rates.basic.daily)}</option>`,
@@ -355,8 +392,9 @@ function render() {
     return { name, station, train, issue, ...rentals };
   });
 
-  const quote = januaryQuote(Number(get('base-price').value));
-  get('rate-days').textContent = '参考の出発日：' + quote.days.map(day => '1/' + day).join('、');
+  const quote = januaryDeparture(selectedDeparture());
+  const dateLabel = '1/' + quote.day + '〜' + (quote.day === 31 ? '2/1' : '1/' + (quote.day + 1));
+  get('rate-days').textContent = '選択中：' + dateLabel + '（1泊2日）・1人 ' + yen(quote.base);
   const [estimate] = calculateTrip({ dates: [quote] }, costs, dinner + early);
   const personTotal = index => {
     const amount = estimate.individuals[index];
@@ -394,6 +432,7 @@ function render() {
   get('share-fallback').hidden = true;
   shareText = allReady ? [
     plan.shareTitle,
+    '日程 ' + dateLabel + '（1泊2日）',
     '基本ツアー代（1人） ' + yen(quote.base),
     '5人合計 ' + groupTotal,
     ...costs.map((person, index) => {
@@ -439,8 +478,8 @@ const participantFields = ['station', 'board', 'wear'];
 
 function exportInputs({ includeNames = false } = {}) {
   return {
-    version: 5,
-    basePrice: Number(get('base-price').value),
+    version: 6,
+    departureDay: selectedDeparture(),
     fares: Object.fromEntries(fareIds.map(id => [id, get(id).value === '' ? '' : String(get(id).valueAsNumber)])),
     dinner: get('dinner').value,
     early: get('early').checked,
@@ -454,7 +493,7 @@ function exportInputs({ includeNames = false } = {}) {
 function restoreInputs(rawData, { includeNames = true } = {}) {
   const data = validateTripInputs(rawData);
   const { participants, dinner } = data;
-  get('base-price').value = String(data.basePrice);
+  get('departure-' + data.departureDay).checked = true;
   get('json-include-names').checked = false;
   get('share-include-names').checked = false;
   for (const id of fareIds) get(id).value = data.fares[id];
